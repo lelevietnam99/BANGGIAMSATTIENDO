@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám Sát Tiến Độ Báo Cáo - PQQ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary: #0d6efd; --danger: #dc3545; --warning: #f39c12; --success: #198754; --bg: #f8f9fa; --card: #ffffff; --text: #333; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 50px; overflow-x: hidden;}
+
+        /* MÀN HÌNH CHỜ & LOADING XỊN XÒ */
+        #entryScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 3000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #entryScreen h1 { color: var(--primary); margin-bottom: 10px; text-transform: uppercase; font-size: 2.2rem; text-align: center;}
+        #entryScreen p { color: #6c757d; margin-bottom: 30px; font-size: 1.2rem; font-weight: 500; text-align: center;}
+        .btn-start { background: linear-gradient(135deg, #0d6efd, #0dcaf0); font-size: 1.3rem; padding: 15px 35px; border-radius: 30px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); animation: pulse 2s infinite; transition: 0.3s;}
+        .btn-start:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(13, 110, 253, 0.6); }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(13, 110, 253, 0); } 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); } }
+
+        #loader { display: none; flex-direction: column; justify-content: center; align-items: center; height: 100vh; position: fixed; top: 0; left: 0; width: 100%; background: var(--bg); z-index: 2000;}
+        #loader h2 { color: var(--primary); margin-bottom: 20px; font-size: 1.6rem; text-align: center;}
+        .progress-container { width: 90%; max-width: 500px; background-color: #e9ecef; border-radius: 20px; height: 28px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #0d6efd, #0dcaf0); border-radius: 20px; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 1rem; background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent); background-size: 1rem 1rem; animation: progress-stripes 1s linear infinite; }
+        @keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }
+        .progress-status { margin-top: 15px; color: var(--primary); font-weight: bold; font-size: 1.1rem; }
+
+        /* GIAO DIỆN CHÍNH */
+        #mainContent { display: none; }
+
+        .header-banner { background: linear-gradient(135deg, #8a1c14, #c0392b); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
+        .header-banner h1 { font-size: 1.8rem; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px;}
+        .deadline-box { display: inline-flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 10px 25px; border-radius: 50px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.3); font-size: 1.1rem; flex-wrap: wrap; justify-content: center;}
+        .countdown { font-weight: bold; color: #f1c40f; font-size: 1.3rem; letter-spacing: 2px;}
+
+        .container { max-width: 1450px; margin: 30px auto; padding: 0 20px; }
+
+        /* THỐNG KÊ TỔNG QUAN */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid transparent; transition: 0.3s;}
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card.danger { border-color: var(--danger); }
+        .stat-card.warning { border-color: var(--warning); }
+        .stat-card.success { border-color: var(--success); }
+        .stat-card.primary { border-color: var(--primary); }
+        .stat-icon { font-size: 2.2rem; margin-bottom: 10px; }
+        .stat-card.danger .stat-icon { color: var(--danger); }
+        .stat-card.warning .stat-icon { color: var(--warning); }
+        .stat-card.success .stat-icon { color: var(--success); }
+        .stat-card.primary .stat-icon { color: var(--primary); }
+        .stat-value { font-size: 2.2rem; font-weight: bold; margin: 5px 0; color: #2c3e50;}
+        .stat-label { color: #6c757d; font-weight: 600; text-transform: uppercase; font-size: 0.85rem;}
+
+        /* BỐ CỤC 2 CỘT */
+        .dashboard-layout { display: grid; grid-template-columns: 420px 1fr; gap: 25px; }
+        @media (max-width: 1024px) { .dashboard-layout { grid-template-columns: 1fr; } }
+        
+        .left-col { display: flex; flex-direction: column; gap: 20px; }
+
+        .panel { background: var(--card); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; }
+        .panel-header { padding: 15px; color: white; font-weight: bold; font-size: 1.05rem; display: flex; justify-content: space-between; align-items: center;}
+        .panel-header.red { background: var(--danger); }
+        .panel-header.orange { background: var(--warning); }
+        .panel-header.green { background: var(--success); }
+        .panel-header.blue { background: var(--primary); }
+        
+        .panel-body { padding: 0; flex: 1; overflow-y: auto; max-height: 350px;} 
+        .panel-body.large { max-height: 880px; }
+
+        /* DANH SÁCH CLB TRÁI */
+        .club-list { list-style: none; }
+        .club-item { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; cursor: pointer;}
+        .club-item:last-child { border-bottom: none; }
+        .club-item.danger-item:hover { background: #fff5f5; border-left: 4px solid var(--danger); }
+        .club-item.warning-item:hover { background: #fffbf0; border-left: 4px solid var(--warning); }
+        .club-item.success-item { flex-direction: column; align-items: stretch; gap: 8px;}
+        .club-item.success-item:hover { background: #f0fdf4; border-left: 4px solid var(--success); }
+        .club-name { font-weight: bold; color: #333; font-size: 0.95rem;}
+        
+        .count-badge { padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+        .badge-red { background: #ffeeba; color: #dc3545; border: 1px solid #f5c6cb;}
+        .badge-orange { background: #fff3cd; color: #856404; border: 1px solid #ffeeba;}
+
+        .btn-copy { background: rgba(255,255,255,0.9); color: #333; border: none; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s; display: flex; align-items: center; gap: 5px;}
+        .btn-copy:hover { background: #fff; transform: scale(1.05);}
+
+        /* BẢNG TIẾN ĐỘ CLB */
+        table { width: 100%; border-collapse: collapse; min-width: 600px;}
+        th { background: #f8f9fa; padding: 15px; text-align: left; font-size: 0.9rem; color: #495057; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--border);}
+        td { padding: 15px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tbody tr:hover { background: #f4f6f8; }
+        
+        .club-name-cell { font-weight: bold; color: var(--primary); font-size: 1.05rem;}
+        .text-center { text-align: center; }
+        
+        /* THANH TIẾN ĐỘ */
+        .prog-wrapper { background: #e9ecef; border-radius: 20px; height: 18px; position: relative; overflow: hidden; width: 100%; border: 1px solid #ced4da;}
+        .prog-fill { height: 100%; transition: width 0.5s ease; background: var(--success); }
+        .prog-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: bold; color: #333; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);}
+
+        .warning-badge-table { background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; border: 1px solid #ffeeba;}
+        .perfect-badge-table { background: #d4edda; color: #155724; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; border: 1px solid #c3e6cb;}
+
+        /* MODAL POPUP CHI TIẾT */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4000; display: none; justify-content: center; align-items: center; padding: 20px;}
+        .modal-content { background: white; width: 100%; max-width: 450px; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: slideDown 0.3s ease;}
+        @keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .modal-header { background: var(--success); color: white; padding: 20px; text-align: center; position: relative;}
+        .modal-header.error-header { background: var(--danger); }
+        .modal-header.warning-header { background: var(--warning); color: #fff;}
+        .modal-header h3 { margin: 0; font-size: 1.2rem;}
+        .close-btn { position: absolute; right: 15px; top: 15px; color: white; background: none; border: none; font-size: 1.5rem; cursor: pointer; transition: 0.2s;}
+        .close-btn:hover { color: #ffeeba; transform: scale(1.1);}
+        
+        .modal-body { padding: 25px; text-align: center; }
+        .modal-stat { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #eee; font-size: 1.05rem;}
+        .modal-stat:last-child { border-bottom: none; }
+        .modal-stat b { color: var(--primary); }
+        .big-percent { font-size: 3rem; font-weight: bold; color: var(--success); margin: 15px 0;}
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    </style>
+</head>
+<body>
+
+    <audio id="bgMusic" loop>
+        <source src="nhac_cho_3.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="entryScreen">
+        <h1><i class="fas fa-satellite-dish"></i> Bảng Giám Sát Tiến Độ PQQ</h1>
+        <p>Hệ thống Đôn đốc & Theo dõi Báo cáo các Đơn vị</p>
+        <button class="btn-start" onclick="startApp()"><i class="fas fa-power-off"></i> VÀO BẢNG GIÁM SÁT</button>
+    </div>
+
+    <div id="loader">
+        <h2><i class="fas fa-sync-alt fa-spin"></i> Đang trích xuất dữ liệu từ 49 Đơn vị...</h2>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar">0%</div>
+        </div>
+        <div class="progress-status" id="progressStatus">Đang thiết lập kết nối API...</div>
+    </div>
+
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalHeaderColor">
+                <button class="close-btn" onclick="closeModal()"><i class="fas fa-times"></i></button>
+                <h3 id="modalTitle">Tên CLB</h3>
+            </div>
+            <div class="modal-body" id="modalBodyContent"></div>
+        </div>
+    </div>
+
+    <div id="mainContent">
+        <div class="header-banner">
+            <h1><i class="fas fa-satellite-dish"></i> Bảng Giám Sát Tiến Độ Báo Cáo Cơ Sở</h1>
+            <div class="deadline-box">
+                <i class="fas fa-clock"></i> Hạn chót cập nhật: <b>01/05/2026</b>
+                <span style="margin: 0 10px;">|</span>
+                <span>Còn lại:</span> <span class="countdown" id="countdownTimer">-- Ngày -- Giờ</span>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card primary">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-label">Tổng Võ Sinh Hợp Lệ</div>
+                    <div class="stat-value" id="statTotalStudents">0</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                    <div class="stat-label">Chưa Cập Nhật (0 Học viên)</div>
+                    <div class="stat-value" id="statEmptyClubs" style="color: var(--danger);">0</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-label">Chưa Báo Cáo Tiến Độ</div>
+                    <div class="stat-value" id="statUnassessed" style="color: var(--warning);">0</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+                    <div class="stat-label">Đang Báo Cáo Tiến Độ</div>
+                    <div class="stat-value" id="statActive" style="color: var(--success);">0</div>
+                </div>
+            </div>
+
+            <div class="dashboard-layout">
+                <div class="left-col">
+                    
+                    <div class="panel">
+                        <div class="panel-header red">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span><i class="fas fa-ban"></i> Chưa cập nhật dữ liệu võ sinh</span>
+                                <span id="countEmpty" style="background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; font-size:0.8rem;">0</span>
+                            </div>
+                            <button class="btn-copy" onclick="copyList('empty')"><i class="fas fa-copy"></i> Copy Nhắc</button>
+                        </div>
+                        <div class="panel-body">
+                            <ul class="club-list" id="listEmpty"></ul>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header orange">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span><i class="fas fa-user-clock"></i> Chưa báo cáo tiến độ võ sinh</span>
+                                <span id="countUnassessed" style="background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; font-size:0.8rem;">0</span>
+                            </div>
+                            <button class="btn-copy" onclick="copyList('unassessed')"><i class="fas fa-copy"></i> Copy Nhắc</button>
+                        </div>
+                        <div class="panel-body">
+                            <ul class="club-list" id="listUnassessed"></ul>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header green">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span><i class="fas fa-check-circle"></i> Đã báo cáo tiến độ</span>
+                                <span id="countActive" style="background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px; font-size:0.8rem;">0</span>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <ul class="club-list" id="listActive"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header blue">
+                        <span><i class="fas fa-tasks"></i> Bảng Tiến Độ Từng Đơn Vị Đã Có Dữ Liệu</span>
+                    </div>
+                    <div class="panel-body large">
+                        <div style="overflow-x: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th width="5%">STT</th>
+                                        <th width="40%">Tên Đơn Vị / Câu Lạc Bộ</th>
+                                        <th width="15%" class="text-center">Sĩ Số</th>
+                                        <th width="20%" class="text-center">Tỷ Lệ Đã Báo Cáo Tiến Độ</th>
+                                        <th width="20%" class="text-center">Số Lượng 0%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="progressTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // DÁN LẠI LINK API HIỆN TẠI CỦA BẠN VÀO ĐÂY:
+        // ==========================================
+        const API_URL = "https://script.google.com/macros/s/AKfycbw1fNzF4fivb1QaAZaxTi5BP11STBn-KSWThwZdca3IZ2w66djU71a3Li4THg0sPZfQwQ/exec"; 
+        const DEADLINE_DATE = new Date("2026-05-25T23:59:59").getTime();
+
+        let currentProgress = 0;
+        let progressInterval;
+        let loadCompleted = false;
+        
+        let globalEmptyClubs = []; 
+        let globalUnassessedClubs = [];
+
+        function startApp() {
+            document.getElementById('entryScreen').style.display = 'none';
+            const audio = document.getElementById('bgMusic');
+            audio.volume = 0.5; 
+            audio.play().catch(e => console.log("Lỗi nhạc:", e));
+            
+            document.getElementById('loader').style.display = 'flex';
+            startCountdown();
+            startLoadingSimulation();
+            fetchData();
+        }
+
+        function startLoadingSimulation() {
+            const progressBar = document.getElementById('progressBar');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            progressInterval = setInterval(() => {
+                if (currentProgress < 90) {
+                    currentProgress += Math.floor(Math.random() * 12) + 1;
+                    if (currentProgress > 90) currentProgress = 90;
+                    progressBar.style.width = currentProgress + "%";
+                    progressBar.innerText = currentProgress + "%";
+                    if(currentProgress > 30 && currentProgress < 60) progressStatus.innerText = "Đang quét danh sách các Võ đường...";
+                    if(currentProgress >= 60) progressStatus.innerText = "Đang kiểm tra dữ liệu...";
+                }
+            }, 300);
+        }
+
+        function completeLoading() {
+            if(loadCompleted) return; 
+            loadCompleted = true;
+            clearInterval(progressInterval);
+            
+            document.getElementById('progressBar').style.width = "100%";
+            document.getElementById('progressBar').innerText = "100%";
+            document.getElementById('progressStatus').innerText = "Hoàn tất! Hệ thống đã sẵn sàng.";
+            
+            setTimeout(() => {
+                const audio = document.getElementById('bgMusic');
+                if(audio) { audio.pause(); audio.currentTime = 0; }
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block'; 
+            }, 800); 
+        }
+
+        function startCountdown() {
+            const timerElement = document.getElementById("countdownTimer");
+            setInterval(function() {
+                const now = new Date().getTime();
+                const distance = DEADLINE_DATE - now;
+
+                if (distance < 0) {
+                    timerElement.innerHTML = "ĐÃ HẾT HẠN!";
+                    timerElement.style.color = "#fff";
+                    timerElement.style.background = "#dc3545";
+                    timerElement.style.padding = "0 10px";
+                    timerElement.style.borderRadius = "5px";
+                    return;
+                }
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                timerElement.innerHTML = `${days} ngày ${hours}h ${minutes}p ${seconds}s`;
+            }, 1000);
+        }
+
+        async function fetchData() {
+            try {
+                if(API_URL.includes("DÁN_LINK")) return alert("Vui lòng dán Link API vào mã HTML!");
+                const res = await fetch(API_URL);
+                const json = await res.json();
+                if(json.status === "success") {
+                    processDashboardData(json.clubs || [], json.data || []);
+                    completeLoading();
+                }
+            } catch(e) {
+                document.getElementById('progressStatus').innerText = "Lỗi kết nối. Vui lòng tải lại trang!";
+                document.getElementById('progressStatus').style.color = "#dc3545";
+                clearInterval(progressInterval);
+            }
+        }
+
+        function processDashboardData(allClubs, rawStudents) {
+            let uniqueClubs = [...new Set(allClubs)];
+            let clubStats = {};
+            uniqueClubs.forEach(club => { clubStats[club] = { total: 0, graded: 0, zero: 0 }; });
+
+            let totalStudents = 0;
+            let totalGraded = 0;
+            let totalZero = 0;
+
+            rawStudents.forEach(st => {
+                let stClub = (st.club || "").toString().trim();
+                let matchedTab = uniqueClubs.find(c => c === stClub);
+                
+                // Khắc phục an toàn: Tìm khớp chứa tên nếu tên hơi lệch
+                if (!matchedTab && stClub.length > 2) {
+                    matchedTab = uniqueClubs.find(c => {
+                        let cleanTab = c.replace(/^\d+\.\s*/, '').trim().toLowerCase();
+                        let cleanSt = stClub.toLowerCase();
+                        return cleanTab === cleanSt || cleanTab.includes(cleanSt) || cleanSt.includes(cleanTab);
+                    });
+                }
+
+                let finalClub = matchedTab || stClub || "Chưa phân loại";
+                
+                if (!clubStats[finalClub]) {
+                    clubStats[finalClub] = { total: 0, graded: 0, zero: 0 };
+                    if (!uniqueClubs.includes(finalClub)) uniqueClubs.push(finalClub);
+                }
+
+                totalStudents++;
+                clubStats[finalClub].total++;
+
+                let p = st.progress ? st.progress.toString().replace('%', '').replace(',', '.').trim() : "0";
+                let percent = parseFloat(p);
+                if (isNaN(percent)) percent = 0;
+
+                if(percent <= 1 && percent > 0 && st.progress.toString().indexOf('%') === -1) {
+                    percent = percent * 100;
+                }
+
+                if (percent > 0) {
+                    clubStats[finalClub].graded++;
+                    totalGraded++;
+                } else {
+                    clubStats[finalClub].zero++;
+                    totalZero++;
+                }
+            });
+
+            // CHIA LÀM 3 NHÓM CHÍNH XÁC
+            const emptyClubs = uniqueClubs.filter(c => clubStats[c].total === 0);
+            const unassessedClubs = uniqueClubs.filter(c => clubStats[c].total > 0 && clubStats[c].graded === 0);
+            const activeClubs = uniqueClubs.filter(c => clubStats[c].total > 0 && clubStats[c].graded > 0);
+
+            globalEmptyClubs = emptyClubs;
+            globalUnassessedClubs = unassessedClubs;
+
+            // Thẻ Thống Kê
+            document.getElementById('statTotalStudents').innerText = totalStudents;
+            document.getElementById('statEmptyClubs').innerText = emptyClubs.length;
+            document.getElementById('statUnassessed').innerText = unassessedClubs.length;
+            document.getElementById('statActive').innerText = activeClubs.length;
+
+            // ĐỔ DỮ LIỆU: PANEL ĐỎ (Chưa cập nhật dữ liệu võ sinh)
+            document.getElementById('countEmpty').innerText = emptyClubs.length;
+            const listEmpty = document.getElementById('listEmpty');
+            if (emptyClubs.length === 0) {
+                listEmpty.innerHTML = '<li class="club-item"><span style="color:var(--success);"><i class="fas fa-check-circle"></i> Tuyệt vời! Tất cả đã cập nhật</span></li>';
+            } else {
+                emptyClubs.forEach(club => {
+                    const li = document.createElement('li');
+                    li.className = "club-item danger-item";
+                    li.innerHTML = `<span class="club-name"><i class="fas fa-ban" style="color: var(--danger); margin-right: 5px;"></i> ${club}</span> <span class="count-badge badge-red">0 Võ sinh</span>`;
+                    li.onclick = () => openModal(club, 0, 0, 0, 0, 'empty');
+                    listEmpty.appendChild(li);
+                });
+            }
+
+            // ĐỔ DỮ LIỆU: PANEL CAM (Chưa báo cáo tiến độ võ sinh)
+            document.getElementById('countUnassessed').innerText = unassessedClubs.length;
+            const listUnassessed = document.getElementById('listUnassessed');
+            if (unassessedClubs.length === 0) {
+                listUnassessed.innerHTML = '<li class="club-item"><span style="color:var(--success);"><i class="fas fa-check-circle"></i> Không có</span></li>';
+            } else {
+                unassessedClubs.forEach(club => {
+                    const stats = clubStats[club];
+                    const li = document.createElement('li');
+                    li.className = "club-item warning-item";
+                    li.innerHTML = `<span class="club-name"><i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 5px;"></i> ${club}</span> <span class="count-badge badge-orange">${stats.total} em (0%)</span>`;
+                    li.onclick = () => openModal(club, stats.total, stats.graded, stats.zero, 0, 'unassessed');
+                    listUnassessed.appendChild(li);
+                });
+            }
+
+            // ĐỔ DỮ LIỆU: PANEL XANH (Đã báo cáo tiến độ)
+            document.getElementById('countActive').innerText = activeClubs.length;
+            const listActive = document.getElementById('listActive');
+            if (activeClubs.length === 0) {
+                listActive.innerHTML = '<li class="club-item"><span>Chưa đơn vị nào báo cáo.</span></li>';
+            } else {
+                activeClubs.forEach(club => {
+                    const stats = clubStats[club];
+                    const gradePercent = Math.round((stats.graded / stats.total) * 100);
+                    let progColor = gradePercent === 100 ? 'var(--success)' : (gradePercent >= 50 ? 'var(--primary)' : 'var(--danger)');
+                    
+                    const li = document.createElement('li');
+                    li.className = "club-item success-item";
+                    li.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                            <span class="club-name"><i class="fas fa-check-circle" style="color: var(--success); margin-right: 5px;"></i> ${club}</span>
+                            <span style="font-size: 0.85rem; font-weight: bold; color: #666;">Đã báo cáo tiến độ: ${stats.graded}/${stats.total} em</span>
+                        </div>
+                        <div class="prog-wrapper" style="height: 14px;">
+                            <div class="prog-fill" style="width: ${gradePercent}%; background-color: ${progColor};"></div>
+                            <span class="prog-text" style="color: ${gradePercent >= 50 ? '#fff' : '#333'}; font-size: 0.65rem;">${gradePercent}%</span>
+                        </div>
+                    `;
+                    li.onclick = () => openModal(club, stats.total, stats.graded, stats.zero, gradePercent, 'active');
+                    listActive.appendChild(li);
+                });
+            }
+
+            // ĐỔ DỮ LIỆU BẢNG BÊN PHẢI 
+            const tbody = document.getElementById('progressTableBody');
+            tbody.innerHTML = '';
+            let tableClubs = [...unassessedClubs, ...activeClubs];
+            tableClubs.sort((a, b) => clubStats[b].zero - clubStats[a].zero); 
+
+            tableClubs.forEach((club, idx) => {
+                const stats = clubStats[club];
+                const gradePercent = Math.round((stats.graded / stats.total) * 100);
+                
+                let progColor = gradePercent === 100 ? 'var(--success)' : (gradePercent >= 50 ? 'var(--primary)' : 'var(--danger)');
+                const progressUI = `
+                    <div class="prog-wrapper">
+                        <div class="prog-fill" style="width: ${gradePercent}%; background-color: ${progColor};"></div>
+                        <span class="prog-text" style="color: ${gradePercent >= 50 ? '#fff' : '#333'};">${gradePercent}%</span>
+                    </div>`;
+
+                let zeroUI = "";
+                if (stats.zero === 0) zeroUI = `<span class="perfect-badge-table"><i class="fas fa-check"></i> Hoàn tất</span>`;
+                else if (stats.zero > 5) zeroUI = `<span class="warning-badge-table"><i class="fas fa-exclamation-circle"></i> Còn ${stats.zero} em</span>`;
+                else zeroUI = `<span style="color: #e67e22; font-weight: bold;">Còn ${stats.zero} em</span>`;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="text-center" style="color: #999; font-weight: bold;">${idx + 1}</td>
+                        <td class="club-name-cell">${club}</td>
+                        <td class="text-center font-weight-bold">${stats.total}</td>
+                        <td style="padding: 15px 20px;">${progressUI}</td>
+                        <td class="text-center">${zeroUI}</td>
+                    </tr>`;
+            });
+        }
+
+        // ==========================================
+        // CÁC HÀM XỬ LÝ NÚT COPY & POPUP
+        // ==========================================
+        function copyList(type) {
+            let textToCopy = "";
+            if(type === 'empty') {
+                if(globalEmptyClubs.length === 0) return alert("Tuyệt vời! Không có Võ đường nào bị thiếu dữ liệu.");
+                textToCopy = "⚠️ [CẢNH BÁO MỨC 1]\nDanh sách CHƯA CẬP NHẬT DỮ LIỆU VÕ SINH trên Hệ thống:\n\n";
+                globalEmptyClubs.forEach((c, i) => textToCopy += `${i + 1}. ${c}\n`);
+                textToCopy += "\n👉 Đề nghị HLV khẩn trương nộp File Báo cáo để BTC tổng hợp!\n";
+            } else if (type === 'unassessed') {
+                if(globalUnassessedClubs.length === 0) return alert("Tuyệt vời! Các Võ đường có DS đều đã bắt đầu chấm điểm.");
+                textToCopy = "⏳ [NHẮC NHỞ TIẾN ĐỘ]\nDanh sách CHƯA BÁO CÁO TIẾN ĐỘ VÕ SINH:\n\n";
+                globalUnassessedClubs.forEach((c, i) => textToCopy += `${i + 1}. ${c}\n`);
+                textToCopy += "\n👉 Kính nhờ HLV vào Link Hệ thống để cập nhật % tiến độ cho học viên nhé!\n";
+            }
+            navigator.clipboard.writeText(textToCopy).then(() => alert("Đã Copy thành công!\nHãy dán (Paste) vào nhóm Zalo để nhắc nhở."));
+        }
+
+        function openModal(clubName, total, graded, zero, percent, type) {
+            document.getElementById('modalTitle').innerText = clubName;
+            let header = document.getElementById('modalHeaderColor');
+            let content = document.getElementById('modalBodyContent');
+            
+            if (type === 'empty') {
+                header.className = 'modal-header error-header';
+                content.innerHTML = `
+                    <i class="fas fa-ban" style="font-size: 4rem; color: var(--danger); margin: 20px 0;"></i>
+                    <h3 style="color: var(--danger); margin-bottom: 10px;">CHƯA CẬP NHẬT DỮ LIỆU</h3>
+                    <p style="color: #666; font-size: 1.1rem; margin-bottom: 20px;">Võ đường này <b>trắng dữ liệu (0 võ sinh hợp lệ)</b>.</p>
+                `;
+            } else if (type === 'unassessed') {
+                header.className = 'modal-header warning-header';
+                content.innerHTML = `
+                    <div class="big-percent" style="color: #fff">0%</div>
+                    <div class="prog-wrapper" style="margin-bottom: 20px;">
+                        <div class="prog-fill" style="width: 0%; background-color: var(--warning)"></div>
+                    </div>
+                    <div class="modal-stat"><span>Tổng sĩ số:</span><b>${total} em</b></div>
+                    <div class="modal-stat"><span>Đã báo cáo tiến độ:</span><b style="color: var(--success);">${graded} em</b></div>
+                    <div class="modal-stat"><span>Chưa báo cáo (0%):</span><b style="color: var(--warning);">${zero} em</b></div>
+                `;
+            } else {
+                header.className = 'modal-header';
+                const pcColor = percent === 100 ? 'var(--success)' : (percent >= 50 ? 'var(--primary)' : 'var(--danger)');
+                content.innerHTML = `
+                    <div class="big-percent" style="color: ${pcColor}">${percent}%</div>
+                    <div class="prog-wrapper" style="margin-bottom: 20px;">
+                        <div class="prog-fill" style="width: ${percent}%; background-color: ${pcColor}"></div>
+                    </div>
+                    <div class="modal-stat"><span>Tổng sĩ số:</span><b>${total} em</b></div>
+                    <div class="modal-stat"><span>Đã báo cáo tiến độ:</span><b style="color: var(--success);">${graded} em</b></div>
+                    <div class="modal-stat"><span>Chưa báo cáo (0%):</span><b style="color: var(--danger);">${zero} em</b></div>
+                `;
+            }
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
+        window.onclick = function(e) { if (e.target == document.getElementById('detailModal')) closeModal(); }
+    </script>
+</body>
+</html>
